@@ -1,0 +1,1 @@
+Sitemap: https://cola5.github.io/{{py-project}}/sitemap.xml

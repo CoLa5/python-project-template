@@ -1,0 +1,199 @@
+[project]
+name = "{{py-project}}"
+version = "0.1.1"
+description = "{{description}}"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+
+authors = [
+  { name = "Corvin Lasogga (@CoLa5)" }
+]
+
+keywords = ["{{keyword}}"]
+
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Operating System :: OS Independent",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+
+dependencies = [
+  "typing-extensions>=4.15.0",
+]
+
+[dependency-groups]
+dev = [
+  "commitizen==4.10.0",
+  "cz-keep-a-changelog-plugin>=0.0.5",
+  "mypy>=2.1.0",
+  "pre-commit>=4.6.0",
+  "pre-commit-uv>=4.2.1",
+  "ruff>=0.15.13",
+]
+docs = [
+  "pdoc>=16.0.0",
+]
+test = [
+  "pytest>=9.0.3",
+  "pytest-cov>=7.1.0",
+  "pytest-md-report>=0.8.0",
+]
+
+[project.urls]
+Homepage = "https://cola5.github.io/{{py-project}}/"
+Documentation = "https://cola5.github.io/{{py-project}}/"
+Code = "https://github.com/CoLa5/{{py-project}}"
+"Issue tracker" = "https://github.com/CoLa5/{{py-project}}/issues"
+
+[build-system]
+requires = ["uv_build>=0.8.12,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.commitizen]
+name = "cz_keep_a_changelog_plugin"
+tag_format = "$version"
+version_provider = "uv"
+version_scheme = "pep440"
+breaking_change_exclamation_in_title = true
+bump_message = "bump: Bump version $current_version -> $new_version"
+changelog_merge_prerelease = true
+major_version_zero = true
+update_changelog_on_bump = true
+
+[tool.commitizen.cz_keep_a_changelog_plugin]
+issue_url_template = "https://github.com/CoLa5/{{py-project}}/issues/{{issue}}"
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+include = [
+  "{{py-project}}/*.py",
+  "{{py-project}}/**/*.py",
+]
+exclude_also = [
+  # Don't complain about missing debug-only code:
+  "def __repr__",
+
+  # Don't complain if tests don't hit defensive assertion code:
+  "raise AssertionError",
+  "raise NotImplementedError",
+
+  # Don't complain if non-runnable code isn't run:
+  "if __name__ == .__main__.:",
+
+  # Don't complain about abstract methods, they aren't run:
+  "@(abc\\.)?abstractmethod",
+]
+ignore_errors = true
+precision = 2
+
+[tool.coverage.html]
+directory = "public/coverage/"
+title = "Coverage report of {{py-project}}"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+
+[tool.pytest.ini_options]
+addopts = "--cov-report=xml --cov={{py-project}}"
+log_cli = true
+log_cli_level = "WARN"
+md_report_color = "never"
+md_report_exclude_outcomes = ["skipped"]
+md_report_flavor = "github"
+
+[tool.ruff]
+fix = true
+line-length = 80
+indent-width = 4
+target-version = "py310"
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+indent-style = "space"
+line-ending = "lf"
+quote-style = "double"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint]
+preview = true
+select = [
+  # flake8-annotations
+  "ANN",
+  # flake8-bugbear
+  "B",
+  # pydocstyle
+  "D",
+  # pydoclint
+  "DOC",
+  # pycodestyle
+  "E",
+  # Pyflakes
+  "F",
+  # flake8-future-annotations
+  "FA",
+  # flake8-fixme
+  "FIX",
+  # flake8-logging-format
+  "G",
+  # isort
+  "I",
+  # flake8-logging
+  "LOG",
+  # flake8-pytest-style
+  "PT",
+  # Ruff-specific rules
+  "RUF",
+  # flake8-simplify
+  "SIM",
+  # pyupgrade
+  "UP",
+]
+extend-ignore = [
+  # missing docstring in magic method
+  "D105",
+  # missing docstring in __init__
+  "D107",
+  # missing blank line after summary
+  "D205",
+]
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+# Source: https://github.com/PyCQA/isort/blob/main/isort/profiles.py#L22
+[tool.ruff.lint.isort]
+case-sensitive = true
+force-single-line = true
+force-sort-within-sections = true
+# lexicographical = true
+single-line-exclusions = ["collections.abc", "typing", "typing_extensions"]
+order-by-type = false
+# group-by-package = true
+
+[tool.ruff.lint.per-file-ignores]
+"test/**" = ["D", "DOC"]  # Do not require docstrings in tests
+
+[tool.typos.files]
+extend-exclude = ["requirements-dev.txt"]
+
+[tool.uv.build-backend]
+module-name = "{{py-project}}"
+module-root = ""
+source_include = ["CHANGELOG.md", "LICENSE", "README.md"]

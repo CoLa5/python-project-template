@@ -1,0 +1,148 @@
+name: release
+on:
+  workflow_call:
+    inputs:
+      app-client-id:
+        description: "GitHub App Client ID"
+        required: true
+        type: string
+    secrets:
+      app-private-key:
+        description: "GitHub App private key"
+        required: true
+permissions:
+  contents: write
+  id-token: write
+jobs:
+  build:
+    name: Build Python distribution
+    runs-on: ubuntu-latest
+    outputs:
+      valid_tag: ${{ steps.tag.outputs.valid_tag}}
+    steps:
+      - name: Check out
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup uv
+        uses: ./.github/actions/setup-uv
+
+      - name: Validate tag to be PEP440-conformant
+        id: tag
+        shell: bash
+        run: |
+          uv run python scripts/pep440_version.py "${GITHUB_REF_NAME}"
+          exit_code=$?
+          valid_tag=$([ "$exit_code" -eq 0 ] && echo true || echo false)
+          echo "valid_tag=${valid_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        if: steps.tag.outputs.valid_tag == 'true'
+        shell: bash
+        run: |
+          uv build
+          uv run python scripts/pip_hashes_md_report.py >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test (wheel & source distribution)
+        if: steps.tag.outputs.valid_tag == 'true'
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          uv run --isolated --no-project --with "dist/{{py-project}}-${VERSION}-py3-none-any.whl" test/smoke_test.py
+          uv run --isolated --no-project --with "dist/{{py-project}}-${VERSION}.tar.gz" test/smoke_test.py
+
+      - name: Upload distribution artifacts
+        if: steps.tag.outputs.valid_tag == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: artifact-dist
+          path: dist/
+
+  publish-github:
+    name: Publish Python distribution to GitHub
+    needs: build
+    if: needs.build.outputs.valid_tag == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub App Token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        id: app-token
+        with:
+          client-id: ${{ inputs.app-client-id }}
+          private-key: ${{ secrets.app-private-key }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Check out
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set Git User
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        shell: bash
+        run: |
+          user_id=$( gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id )
+          git_user_name="${{ steps.app-token.outputs.app-slug }}[bot]"
+          git_user_email="${user_id}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+          git config --local user.name "${git_user_name}"
+          git config --local user.email "${git_user_email}"
+          git config --local pull.rebase true
+          echo "Git name: $(git config --get user.name)"
+          echo "Git email: $(git config --get user.email)"
+
+      - name: Setup uv
+        uses: ./.github/actions/setup-uv
+
+      - name: Create the changelog for release
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          uv run cz changelog "$VERSION" --dry-run | tail -n +12 > RELEASE.md
+
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: artifact-dist
+          path: dist/
+
+      - name: Release to github
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          gh release create "$VERSION" \
+          "dist/{{py-project}}-${VERSION}-py3-none-any.whl" \
+          "dist/{{py-project}}-${VERSION}.tar.gz" \
+          --title "$VERSION" \
+          --notes-file RELEASE.md
+
+  publish-pypi:
+    name: Publish Python distribution to PyPI
+    needs:
+      - build
+      - publish-github
+    environment:
+      name: pypi
+    if: needs.build.outputs.valid_tag == 'true'
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup uv
+        uses: ./.github/actions/setup-uv
+
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: artifact-dist
+          path: dist/
+
+      - name: Publish distribution to PyPI
+        shell: bash
+        run: uv publish

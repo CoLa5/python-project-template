@@ -1,0 +1,73 @@
+name: ci
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main", "dev"]
+    tags: ["*"]
+
+permissions:
+  contents: read
+
+jobs:
+  pre-commit:
+    name: Pre-Commit
+    if: ${{ !startsWith(github.event.head_commit.message, 'docs(changelog):') }}
+    uses: ./.github/workflows/pre-commit.yml
+
+  test:
+    name: Test
+    needs: pre-commit
+    if: ${{ !startsWith(github.event.head_commit.message, 'docs(changelog):') }}
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        platform: [ubuntu-latest, windows-latest, macos-latest]
+    uses: ./.github/workflows/test.yml
+    with:
+      platform: ${{ matrix.platform }}
+      python-version: ${{ matrix.python-version }}
+    secrets:
+      gist-secret: ${{ secrets.GIST_SECRET }}
+
+  changelog:
+    name: Changelog
+    needs: test
+    if:
+      ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (!startsWith(github.event.head_commit.message, 'bump:') ||
+      !startsWith(github.event.head_commit.message, 'docs(changelog):')) }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/changelog.yml
+    with:
+      app-client-id: ${{ vars.APP_CLIENT_ID }}
+    secrets:
+      app-private-key: ${{ secrets.APP_SECRET }}
+
+  docs:
+    name: Docs
+    needs: changelog
+    if:
+      ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      !startsWith(github.event.head_commit.message, 'docs(changelog):') }}
+    permissions:
+      actions: read
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/docs.yml
+
+  release:
+    name: Release
+    needs: test
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    permissions:
+      contents: write
+      id-token: write
+    uses: ./.github/workflows/release.yml
+    with:
+      app-client-id: ${{ vars.APP_CLIENT_ID }}
+    secrets:
+      app-private-key: ${{ secrets.APP_SECRET }}
